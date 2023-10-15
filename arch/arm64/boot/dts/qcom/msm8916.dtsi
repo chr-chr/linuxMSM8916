@@ -486,9 +486,9 @@
 			reg = <0x004ab000 0x4>;
 		};
 
-		qfprom: qfprom@5c000 {
+		qfprom0: qfprom@5c200 {
 			compatible = "qcom,msm8916-qfprom", "qcom,qfprom";
-			reg = <0x0005c000 0x1000>;
+			reg = <0x0005c000 0x28>;
 			#address-cells = <1>;
 			#size-cells = <1>;
 
@@ -566,6 +566,17 @@
 				reg = <0xef 0x1>;
 				bits = <5 3>;
 			};
+		};
+		/*
+		split out section to make CONFIG_NVMEM_SYSFS=y working, otherwise
+		cat /sys/bus/nvmem/devices/qfprom0/nvmem
+		Oops
+		*/
+		qfprom1: qfprom@5c0d0 {
+			compatible = "qcom,msm8916-qfprom", "qcom,qfprom";
+			reg = <0x005c0d0 0x20>;
+			#address-cells = <1>;
+			#size-cells = <1>;
 		};
 
 		rpm_msg_ram: sram@60000 {
