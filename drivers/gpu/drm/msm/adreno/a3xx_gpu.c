@@ -7,6 +7,7 @@
  */
 
 #include "a3xx_gpu.h"
+#include <linux/nvmem-consumer.h>
 
 #define A3XX_INT0_MASK \
 	(A3XX_INT0_RBBM_AHB_ERROR |        \
@@ -503,6 +504,43 @@ static u32 a3xx_get_rptr(struct msm_gpu *gpu, struct msm_ringbuffer *ring)
 	return ring->memptrs->rptr;
 }
 
+static int a3xx_set_supported_hw(struct device *dev, struct adreno_gpu *adreno_gpu)
+{
+	u32 speedbin, version;
+	int ret;
+
+	ret = nvmem_cell_read_variable_le_u32(dev, "speed_bin_version", &version);
+	/*
+	 * -ENOENT means that the platform doesn't support speedbin which is
+	 * fine
+	 */
+	if (ret == -ENOENT) {
+		return 0;
+	} else if (ret) {
+		dev_err_probe(dev, ret,
+			"failed to read speed-bin-version. Some OPPs may not be supported by hardware\n");
+		return ret;
+	}
+
+	ret = nvmem_cell_read_variable_le_u32(dev, "speed_bin", &speedbin);
+	if (ret) {
+		dev_err_probe(dev, ret,
+			"failed to read speed-bin. Some OPPs may not be supported by hardware\n");
+		return ret;
+	}
+	dev_info(dev, "speed-bin version: %u value: %u\n", version, speedbin);
+
+	// if (version > 0)
+	// we must set at least version 0x1 otherwise no opp gets selected
+	// having opp-supported-hw property
+	if (speedbin == 0)
+		speedbin = 0x1;
+
+	return devm_pm_opp_set_supported_hw(dev, &speedbin, 1);
+
+	return 0;
+}
+
 static struct msm_gpu *a3xx_gpu_init(struct drm_device *dev)
 {
 	struct a3xx_gpu *a3xx_gpu = NULL;
@@ -531,6 +569,9 @@ static struct msm_gpu *a3xx_gpu_init(struct drm_device *dev)
 	gpu = &adreno_gpu->base;
 
 	adreno_gpu->registers = a3xx_registers;
+
+	/* speed-bin */
+	a3xx_set_supported_hw(&pdev->dev, adreno_gpu);
 
 	ret = adreno_gpu_init(dev, pdev, adreno_gpu, config->info->funcs, 1);
 	if (ret)
