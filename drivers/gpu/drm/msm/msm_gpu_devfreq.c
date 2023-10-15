@@ -247,10 +247,10 @@ void msm_devfreq_suspend(struct msm_gpu *gpu)
 	df->suspended = true;
 	mutex_unlock(&df->lock);
 
-	devfreq_suspend_device(df->devfreq);
-
 	cancel_idle_work(df);
 	cancel_boost_work(df);
+
+	devfreq_suspend_device(df->devfreq);
 }
 
 static void msm_devfreq_boost_work(struct kthread_work *work)
