@@ -69,7 +69,6 @@ static int enable_clk(struct msm_gpu *gpu)
 
 	if (gpu->core_clk && gpu->fast_rate)
 		dev_pm_opp_set_rate(&gpu->pdev->dev, gpu->fast_rate);
-
 	*/
 
 	/* Set the RBBM timer rate to 19.2Mhz */
@@ -116,6 +115,7 @@ int msm_gpu_pm_resume(struct msm_gpu *gpu)
 	int ret;
 
 	DBG("%s", gpu->name);
+	dev_dbg(&gpu->pdev->dev, "%s\n", __func__);
 	trace_msm_gpu_resume(0);
 
 	ret = enable_pwrrail(gpu);
@@ -133,6 +133,7 @@ int msm_gpu_pm_resume(struct msm_gpu *gpu)
 	msm_devfreq_resume(gpu);
 
 	gpu->needs_hw_init = true;
+	dev_dbg(&gpu->pdev->dev, "%s done\n", __func__);
 
 	return 0;
 }
@@ -142,6 +143,7 @@ int msm_gpu_pm_suspend(struct msm_gpu *gpu)
 	int ret;
 
 	DBG("%s", gpu->name);
+	dev_dbg(&gpu->pdev->dev, "%s\n", __func__);
 	trace_msm_gpu_suspend(0);
 
 	msm_devfreq_suspend(gpu);
@@ -159,6 +161,7 @@ int msm_gpu_pm_suspend(struct msm_gpu *gpu)
 		return ret;
 
 	gpu->suspend_count++;
+	dev_dbg(&gpu->pdev->dev, "%s done\n", __func__);
 
 	return 0;
 }
@@ -743,7 +746,6 @@ static void retire_submit(struct msm_gpu *gpu, struct msm_ringbuffer *ring,
 	gpu->active_submits--;
 	WARN_ON(gpu->active_submits < 0);
 	if (!gpu->active_submits) {
-		msm_devfreq_idle(gpu);
 		pm_runtime_put_autosuspend(&gpu->pdev->dev);
 	}
 
@@ -831,7 +833,6 @@ void msm_gpu_submit(struct msm_gpu *gpu, struct msm_gem_submit *submit)
 	mutex_lock(&gpu->active_lock);
 	if (!gpu->active_submits) {
 		pm_runtime_get(&gpu->pdev->dev);
-		msm_devfreq_active(gpu);
 	}
 	gpu->active_submits++;
 	mutex_unlock(&gpu->active_lock);
