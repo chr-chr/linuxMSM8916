@@ -28,6 +28,8 @@ static int msm_devfreq_target(struct device *dev, unsigned long *freq,
 	if (df->suspended)
 		dev_err(dev, "%s while suspended ??\n", __func__);
 
+	dev_dbg(dev, "suggest: %lu\n", *freq);
+
 	unsigned long curr_freq = get_freq(gpu);
 	if (*freq == curr_freq)
 		return 0;
@@ -86,7 +88,7 @@ static int msm_devfreq_get_dev_status(struct device *dev,
 	status->total_time = ktime_us_delta(time, df->time);
 	df->time = time;
 
-	if (df->suspended) {
+	if ((df->suspended) || (status->total_time == 0)) {
 		mutex_unlock(&df->lock);
 		status->busy_time = 0;
 		return 0;
@@ -96,23 +98,32 @@ static int msm_devfreq_get_dev_status(struct device *dev,
 	busy_time = busy_cycles - df->busy_cycles;
 	df->busy_cycles = busy_cycles;
 
-	mutex_unlock(&df->lock);
 
 	busy_time *= USEC_PER_SEC;
 	busy_time = div64_ul(busy_time, sample_rate);
 	if (WARN_ON(busy_time > ~0LU))
 		busy_time = ~0LU;
 
-	status->busy_time = busy_time;
+	/*
+		running avg: load per mille:
+		a=((a*2) + (p+c))/4; p=c; a
+	*/
+	unsigned long load = busy_time*1000 / status->total_time;
+	df->load_avg = ((df->load_avg * 2) + (df->load + load)) / 4;
+	df->load = load;
+
+	status->busy_time = df->load_avg;
+	status->total_time = 1000;
 
 	dev_dbg(&gpu->pdev->dev,
-		"busy %lu / total %lu = %lu | freq %lu MHz bscy: %llu | srate: %lu\n",
+		"busy %lu / total %lu = %lu | freq %lu MHz load: %lu | srate: %lu\n",
 		status->busy_time, status->total_time,
-		status->busy_time / (status->total_time / 100),
+		status->busy_time * 100 / status->total_time,
 		status->current_frequency / 1000 / 1000,
-		busy_cycles,
+		load,
 		sample_rate);
 
+	mutex_unlock(&df->lock);
 
 	return 0;
 }
@@ -142,7 +153,6 @@ void msm_devfreq_init(struct msm_gpu *gpu)
 {
 	struct msm_gpu_devfreq *df = &gpu->devfreq;
 	struct msm_drm_private *priv = gpu->dev->dev_private;
-	int ret;
 
 	/* We need target support to do devfreq */
 	if (!gpu->funcs->gpu_busy)
@@ -154,8 +164,8 @@ void msm_devfreq_init(struct msm_gpu *gpu)
 	 * where due to stalling waiting for vblank we could get stuck
 	 * at (for ex) 30fps at 50% utilization.
 	 */
-	priv->gpu_devfreq_config.upthreshold = 50;
-	priv->gpu_devfreq_config.downdifferential = 10;
+	priv->gpu_devfreq_config.upthreshold = 80;
+	priv->gpu_devfreq_config.downdifferential = 20;
 
 	mutex_init(&df->lock);
 	df->suspended = true;
@@ -227,10 +237,11 @@ void msm_devfreq_suspend(struct msm_gpu *gpu)
 	if (!has_devfreq(gpu))
 		return;
 
+	devfreq_suspend_device(df->devfreq);
+
 	mutex_lock(&df->lock);
 	df->suspended = true;
 	mutex_unlock(&df->lock);
 
-	devfreq_suspend_device(df->devfreq);
 }
 
