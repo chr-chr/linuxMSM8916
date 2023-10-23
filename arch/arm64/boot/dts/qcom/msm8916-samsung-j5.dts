@@ -161,9 +161,17 @@
 	vdd-supply = <&sm5703_ldo3>;
 };
 
+/*why??
+definition in msm8916.dtsi are like downstream!
+result: charge < 500mA !
+
 &usb_hs_phy {
 	qcom,init-seq = /bits/ 8 <0x1 0x19 0x2 0x0b>;
 };
+result:
+charge ~850mA careless of supply type ....
+
+*/
 
 &tlmm {
 	proxy_ldo_en_default: proxy-ldo-en-default-state {
