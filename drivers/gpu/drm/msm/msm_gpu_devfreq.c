@@ -108,7 +108,7 @@ static int msm_devfreq_get_dev_status(struct device *dev,
 		running avg: load per mille:
 		a=((a*2) + (p+c))/4; p=c; a
 	*/
-	unsigned long load = busy_time*1000 / status->total_time;
+	unsigned long load = div64_ul(busy_time*1000, status->total_time);
 	df->load_avg = ((df->load_avg * 2) + (df->load + load)) / 4;
 	df->load = load;
 
