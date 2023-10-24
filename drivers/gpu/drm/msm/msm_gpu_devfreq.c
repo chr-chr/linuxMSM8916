@@ -109,7 +109,7 @@ running avg:
 a=((a*2) + (p+c))/4; p=c; a
 load per mille:
 	*/
-	unsigned long load = busy_time*1000 / status->total_time;
+	unsigned long load = div64_ul(busy_time*1000, status->total_time);
 	df->load_avg = ((df->load_avg * 2) + (df->load + load)) / 4;
 	df->load = load;
 
