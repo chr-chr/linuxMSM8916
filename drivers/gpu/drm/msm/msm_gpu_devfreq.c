@@ -24,9 +24,11 @@ static int msm_devfreq_target(struct device *dev, unsigned long *freq,
 	struct msm_gpu_devfreq *df = &gpu->devfreq;
 	struct dev_pm_opp *opp;
 
-	// opp-suspend kacke ....
-	if (df->suspended)
+	// happens set max-freq via /sys !
+	if (df->suspended) {
 		dev_err(dev, "%s while suspended ??\n", __func__);
+		return 0;
+	}
 
 	dev_dbg(dev, "suggest: %lu\n", *freq);
 
